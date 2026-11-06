@@ -1,3 +1,4 @@
+import random
 import asyncio
 import sys
 
@@ -26,26 +27,40 @@ app = Client(
 def start_command(client, message):
     message.reply_text("مرحباً بك في بوت التحميل !📥أرسل لي أي رابط وسأقوم بتحميله لك فوراً")
 
-@app.on_message(filters.text & ~filters.command("start"))
+@app.on_message(filters.text & ~filters.command(["start"]))
 def download_media(client, message):
-    url = message.text
-    if not url.startswith("http"):
-        message.reply_text("Please send a valid link.")
-        return
+    url = message.text.strip()
     
-    msg = message.reply_text("Downloading media, please wait...")
+    if not url.startswith("http://") and not url.startswith("https://"):
+        return
+
+    msg = message.reply_text("جاري تحميل الميديا، يرجى الانتظار قليلاً...")
+    random_filename = f"media_{random.randint(1000, 9999)}"
     
     ydl_opts = {
         'format': 'best',
-        'outtmpl': 'video.mp4',
+        'outtmpl': f'{random_filename}.%(ext)s',
+        'quiet': True,
     }
     
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
-        message.reply_video("video.mp4")
+            info = ydl.extract_info(url, download=True)
+            filename = ydl.prepare_filename(info)
+            
+        if "spotify.com" in url:
+            message.reply_audio(filename)
+        else:
+            message.reply_video(filename)
+            
         msg.delete()
+        
+        if os.path.exists(filename):
+            os.remove(filename)
+            
     except Exception as e:
-        msg.edit_text("❌┇عذراً لقد قمت بأرسال رابط غير صحيح.")
-
+        msg.edit_text("❌ عذراً، لقد قمت بأرسال رابط غير صحيح")
+        for f in os.listdir('.'):
+            if f.startswith(random_filename):
+                os.path.exists(f) and os.remove(f)
 app.run()
